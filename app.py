@@ -6,6 +6,7 @@ from wakeonlan import wol
 import os.path
 from functools import lru_cache, partial
 import logging
+from collections import namedtuple
 
 LAYOUT = [
     ['spacer_button_1_of_2', 'power'],
@@ -16,31 +17,32 @@ LAYOUT = [
     ['replay', 'info'],
     ['previous', 'play', 'next'],
     ['vol_down', 'vol_up', 'vol_mute'],
-    ['app_BloombergTV', 'app_Twitch'],
+    ['app_Computer', 'app_Twitch'],
     ['app_Plex', 'app_YouTube'],
 ]
 
-BUTTON_MAPPING = {
-    'back': lambda e: post_keypress('Back'),
-    'home': lambda e: post_keypress('Home'),
-    'up': lambda e: post_keypress('Up'),
-    'left': lambda e: post_keypress('Left'),
-    'ok': lambda e: post_keypress('Select'),
-    'right': lambda e: post_keypress('Right'),
-    'down': lambda e: post_keypress('Down'),
-    'replay': lambda e: post_keypress('InstantReplay'),
-    'info': lambda e: post_keypress('Info'),
-    'previous': lambda e: post_keypress('Rev'),
-    'play': lambda e: post_keypress('Play'),
-    'next': lambda e: post_keypress('Fwd'),
-    'power': lambda e: power_button_keypress(),
-    'vol_down': lambda e: post_keypress('VolumeDown'),
-    'vol_up': lambda e: post_keypress('VolumeUp'),
-    'vol_mute': lambda e: post_keypress('VolumeMute'),
-}
+ButtonMap = namedtuple('ButtonMap', ['button_name', 'action', 'keybinding'])
+BUTTON_MAPS = [
+    ButtonMap('back', lambda e: post_keypress('Back'), wx.WXK_BACK),
+    ButtonMap('home', lambda e: post_keypress('Home'), wx.WXK_ESCAPE),
+    ButtonMap('up', lambda e: post_keypress('Up'), wx.WXK_UP),
+    ButtonMap('left', lambda e: post_keypress('Left'), wx.WXK_LEFT),
+    ButtonMap('ok', lambda e: post_keypress('Select'), wx.WXK_RETURN),
+    ButtonMap('right', lambda e: post_keypress('Right'), wx.WXK_RIGHT),
+    ButtonMap('down', lambda e: post_keypress('Down'), wx.WXK_DOWN),
+    ButtonMap('replay', lambda e: post_keypress('InstantReplay'), wx.WXK_NUMPAD0),
+    ButtonMap('info', lambda e: post_keypress('Info'), wx.WXK_NUMPAD0),
+    ButtonMap('previous', lambda e: post_keypress('Rev'), wx.WXK_NUMPAD0),
+    ButtonMap('play', lambda e: post_keypress('Play'), wx.WXK_NUMPAD0),
+    ButtonMap('next', lambda e: post_keypress('Fwd'), wx.WXK_NUMPAD0),
+    ButtonMap('power', lambda e: power_button_keypress(), wx.WXK_NUMPAD0),
+    ButtonMap('vol_down', lambda e: post_keypress('VolumeDown'), wx.WXK_NUMPAD0),
+    ButtonMap('vol_up', lambda e: post_keypress('VolumeUp'), wx.WXK_NUMPAD0),
+    ButtonMap('vol_mute', lambda e: post_keypress('VolumeMute'), wx.WXK_NUMPAD0),
+]
+BUTTON_TO_ACTION = { x.button_name: x.action for x in BUTTON_MAPS}
+KEYBINDING_TO_ACTION = { x.keybinding: x.action for x in BUTTON_MAPS}
 
-MAC_ADDRESS = 'FF:FF:FF:FF:FF:FF'
-IP_ADDRESS = '192.168.3.21'
 PORT = 8060
 BASE_URL="http://%s:%s" % (IP_ADDRESS, PORT)
 WOL_BROADCAST_ADDRESS = '255.255.255.255'
@@ -104,6 +106,7 @@ class MainWindow(wx.Frame):
         wx.Frame.__init__(self, parent, title=title, size=(400,800))
         self.remote = wx.Panel(self)
         self.remote.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.remote.Bind(wx.EVT_KEY_UP, self.OnKeypress)
 
         remote_content = wx.BoxSizer(wx.VERTICAL)
         for row in LAYOUT:
@@ -122,8 +125,8 @@ class MainWindow(wx.Frame):
                     button = wx.StaticBitmap(self.remote, -1,
                         wx.Bitmap("images/%s.png" % element, wx.BITMAP_TYPE_ANY))
                     remote_content_row.Add(button)
-                    if element in BUTTON_MAPPING:
-                        button.Bind(wx.EVT_LEFT_UP, BUTTON_MAPPING[element])
+                    if element in BUTTON_TO_ACTION:
+                        button.Bind(wx.EVT_LEFT_UP, BUTTON_TO_ACTION[element])
 
             remote_content.Add(remote_content_row)
 
@@ -161,6 +164,11 @@ class MainWindow(wx.Frame):
         brush = wx.Brush('black')
         dc.SetBackground(brush)
         dc.Clear()
+
+    def OnKeypress(self, event):
+        keycode = event.GetKeyCode()
+        if keycode in KEYBINDING_TO_ACTION:
+            KEYBINDING_TO_ACTION[keycode](event)
 
 app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
 window = MainWindow(None, 'RokuTV Remote') # A Frame is a top-level window.
